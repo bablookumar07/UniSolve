@@ -1,9 +1,13 @@
 import createAuditLog from "../utils/createAuditLog.js";
+import createNotification from "../utils/createNotification.js";
 import Complaint from "../models/Complaint.js";
 import Category from "../models/Category.js";
 import User from "../models/User.js";
 
 
+// ============================================================
+// CREATE COMPLAINT
+// ============================================================
 
 export const createComplaint = async (req, res) => {
   try {
@@ -20,7 +24,8 @@ export const createComplaint = async (req, res) => {
     if (!title || !description || !category || !location) {
       return res.status(400).json({
         success: false,
-        message: "Title, description, category and location are required",
+        message:
+          "Title, description, category and location are required",
       });
     }
 
@@ -53,17 +58,17 @@ export const createComplaint = async (req, res) => {
       status: "PENDING",
     });
 
-    //audit logs
+    // 5. Create audit log
     await createAuditLog({
-  complaint: complaint._id,
-  performedBy: req.user._id,
-  action: "CREATED",
-  previousStatus: null,
-  newStatus: "PENDING",
-  details: "Complaint created by student",
-});
+      complaint: complaint._id,
+      performedBy: req.user._id,
+      action: "CREATED",
+      previousStatus: null,
+      newStatus: "PENDING",
+      details: "Complaint created by student",
+    });
 
-    // 5. Return created complaint
+    // 6. Return created complaint
     return res.status(201).json({
       success: true,
       message: "Complaint created successfully",
@@ -90,6 +95,11 @@ export const createComplaint = async (req, res) => {
   }
 };
 
+
+// ============================================================
+// GET MY COMPLAINTS
+// ============================================================
+
 export const getMyComplaints = async (req, res) => {
   try {
     const complaints = await Complaint.find({
@@ -112,6 +122,11 @@ export const getMyComplaints = async (req, res) => {
     });
   }
 };
+
+
+// ============================================================
+// GET COMPLAINT BY ID
+// ============================================================
 
 export const getComplaintById = async (req, res) => {
   try {
@@ -136,7 +151,8 @@ export const getComplaintById = async (req, res) => {
     ) {
       return res.status(403).json({
         success: false,
-        message: "You do not have permission to view this complaint",
+        message:
+          "You do not have permission to view this complaint",
       });
     }
 
@@ -153,6 +169,11 @@ export const getComplaintById = async (req, res) => {
     });
   }
 };
+
+
+// ============================================================
+// GET ALL COMPLAINTS - ADMIN
+// ============================================================
 
 export const getAllComplaints = async (req, res) => {
   try {
@@ -176,6 +197,11 @@ export const getAllComplaints = async (req, res) => {
     });
   }
 };
+
+
+// ============================================================
+// ASSIGN COMPLAINT - ADMIN
+// ============================================================
 
 export const assignComplaint = async (req, res) => {
   try {
@@ -214,20 +240,33 @@ export const assignComplaint = async (req, res) => {
       });
     }
 
-    // 4. Assign complaint
+    // 4. Store previous status
+    const previousStatus = complaint.status;
+
+    // 5. Assign complaint
     complaint.assignedTo = staff._id;
     complaint.status = "ASSIGNED";
 
     await complaint.save();
 
+    // 6. Audit log
     await createAuditLog({
-  complaint: complaint._id,
-  performedBy: req.user._id,
-  action: "ASSIGNED",
-  previousStatus: "PENDING",
-  newStatus: "ASSIGNED",
-  details: `Complaint assigned to staff member ${staff.name}`,
-});
+      complaint: complaint._id,
+      performedBy: req.user._id,
+      action: "ASSIGNED",
+      previousStatus,
+      newStatus: "ASSIGNED",
+      details: `Complaint assigned to staff member ${staff.name}`,
+    });
+
+    // 7. Notify staff
+    await createNotification({
+      recipient: staff._id,
+      complaint: complaint._id,
+      type: "COMPLAINT_ASSIGNED",
+      title: "New Complaint Assigned",
+      message: `Complaint ${complaint.complaintId} has been assigned to you.`,
+    });
 
     return res.status(200).json({
       success: true,
@@ -248,6 +287,11 @@ export const assignComplaint = async (req, res) => {
     });
   }
 };
+
+
+// ============================================================
+// GET ASSIGNED COMPLAINTS - STAFF
+// ============================================================
 
 export const getAssignedComplaints = async (req, res) => {
   try {
@@ -273,6 +317,12 @@ export const getAssignedComplaints = async (req, res) => {
   }
 };
 
+
+// ============================================================
+// START COMPLAINT - STAFF
+// ASSIGNED / REOPENED → IN_PROGRESS
+// ============================================================
+
 export const startComplaint = async (req, res) => {
   try {
     const { id } = req.params;
@@ -286,6 +336,7 @@ export const startComplaint = async (req, res) => {
       });
     }
 
+    // Verify assigned staff
     if (
       !complaint.assignedTo ||
       complaint.assignedTo.toString() !== req.user._id.toString()
@@ -296,28 +347,41 @@ export const startComplaint = async (req, res) => {
       });
     }
 
+    // Only ASSIGNED or REOPENED complaints can be started
     if (!["ASSIGNED", "REOPENED"].includes(complaint.status)) {
       return res.status(400).json({
         success: false,
-        message: "Only assigned or reopened complaints can be started",
+        message:
+          "Only assigned or reopened complaints can be started",
       });
     }
+
+    // IMPORTANT:
+    // Store previous status BEFORE changing it
+    const previousStatus = complaint.status;
 
     complaint.status = "IN_PROGRESS";
 
     await complaint.save();
 
+    // Audit log
     await createAuditLog({
-  complaint: complaint._id,
-  performedBy: req.user._id,
-  action: "STARTED",
-  previousStatus: complaint.status === "REOPENED"
-    ? "REOPENED"
-    : "ASSIGNED",
-  newStatus: "IN_PROGRESS",
-  details: "Staff started working on the complaint",
-});
+      complaint: complaint._id,
+      performedBy: req.user._id,
+      action: "STARTED",
+      previousStatus,
+      newStatus: "IN_PROGRESS",
+      details: "Staff started working on the complaint",
+    });
 
+    // Notify student
+    await createNotification({
+      recipient: complaint.createdBy,
+      complaint: complaint._id,
+      type: "COMPLAINT_STARTED",
+      title: "Complaint Work Started",
+      message: `Work has started on complaint ${complaint.complaintId}.`,
+    });
 
     return res.status(200).json({
       success: true,
@@ -339,12 +403,18 @@ export const startComplaint = async (req, res) => {
   }
 };
 
+
+// ============================================================
+// RESOLVE COMPLAINT - STAFF
+// IN_PROGRESS → RESOLVED
+// ============================================================
+
 export const resolveComplaint = async (req, res) => {
   try {
     const { id } = req.params;
     const { notes } = req.body;
 
-    // 1. Resolution notes are required
+    // 1. Resolution notes required
     if (!notes || !notes.trim()) {
       return res.status(400).json({
         success: false,
@@ -381,25 +451,34 @@ export const resolveComplaint = async (req, res) => {
       });
     }
 
-    // 5. Store resolution
+    // 5. Store previous status
     const previousStatus = complaint.status;
 
-complaint.resolution.notes = notes.trim();
-complaint.status = "RESOLVED";
-complaint.resolvedAt = new Date();
+    // 6. Store resolution
+    complaint.resolution.notes = notes.trim();
+    complaint.status = "RESOLVED";
+    complaint.resolvedAt = new Date();
 
-await complaint.save();
+    await complaint.save();
 
-await createAuditLog({
-  complaint: complaint._id,
-  performedBy: req.user._id,
-  action: "RESOLVED",
-  previousStatus,
-  newStatus: "RESOLVED",
-  details: "Staff resolved the complaint",
-});
+    // 7. Audit log
+    await createAuditLog({
+      complaint: complaint._id,
+      performedBy: req.user._id,
+      action: "RESOLVED",
+      previousStatus,
+      newStatus: "RESOLVED",
+      details: "Staff resolved the complaint",
+    });
 
-
+    // 8. Notify student
+    await createNotification({
+      recipient: complaint.createdBy,
+      complaint: complaint._id,
+      type: "COMPLAINT_RESOLVED",
+      title: "Complaint Resolved",
+      message: `Complaint ${complaint.complaintId} has been marked as resolved. Please review the resolution.`,
+    });
 
     return res.status(200).json({
       success: true,
@@ -422,6 +501,12 @@ await createAuditLog({
   }
 };
 
+
+// ============================================================
+// CLOSE COMPLAINT - STUDENT
+// RESOLVED → CLOSED
+// ============================================================
+
 export const closeComplaint = async (req, res) => {
   try {
     const { id } = req.params;
@@ -435,15 +520,18 @@ export const closeComplaint = async (req, res) => {
       });
     }
 
-    // Only the student who created the complaint can close it
-    if (complaint.createdBy.toString() !== req.user._id.toString()) {
+    // Only complaint owner can close it
+    if (
+      complaint.createdBy.toString() !== req.user._id.toString()
+    ) {
       return res.status(403).json({
         success: false,
-        message: "You do not have permission to close this complaint",
+        message:
+          "You do not have permission to close this complaint",
       });
     }
 
-    // Complaint must be resolved first
+    // Only RESOLVED complaints can be closed
     if (complaint.status !== "RESOLVED") {
       return res.status(400).json({
         success: false,
@@ -453,19 +541,32 @@ export const closeComplaint = async (req, res) => {
 
     const previousStatus = complaint.status;
 
-complaint.status = "CLOSED";
-complaint.closedAt = new Date();
+    complaint.status = "CLOSED";
+    complaint.closedAt = new Date();
 
-await complaint.save();
+    await complaint.save();
 
-await createAuditLog({
-  complaint: complaint._id,
-  performedBy: req.user._id,
-  action: "CLOSED",
-  previousStatus,
-  newStatus: "CLOSED",
-  details: "Student accepted the resolution and closed the complaint",
-});
+    // Audit log
+    await createAuditLog({
+      complaint: complaint._id,
+      performedBy: req.user._id,
+      action: "CLOSED",
+      previousStatus,
+      newStatus: "CLOSED",
+      details:
+        "Student accepted the resolution and closed the complaint",
+    });
+
+    // Notify assigned staff
+    if (complaint.assignedTo) {
+      await createNotification({
+        recipient: complaint.assignedTo,
+        complaint: complaint._id,
+        type: "COMPLAINT_CLOSED",
+        title: "Complaint Closed",
+        message: `Complaint ${complaint.complaintId} has been closed by the student.`,
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -487,11 +588,18 @@ await createAuditLog({
   }
 };
 
+
+// ============================================================
+// REOPEN COMPLAINT - STUDENT
+// RESOLVED → REOPENED
+// ============================================================
+
 export const reopenComplaint = async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
 
+    // 1. Reopen reason required
     if (!reason || !reason.trim()) {
       return res.status(400).json({
         success: false,
@@ -499,6 +607,7 @@ export const reopenComplaint = async (req, res) => {
       });
     }
 
+    // 2. Find complaint
     const complaint = await Complaint.findById(id);
 
     if (!complaint) {
@@ -508,15 +617,18 @@ export const reopenComplaint = async (req, res) => {
       });
     }
 
-    // Only complaint owner can reopen it
-    if (complaint.createdBy.toString() !== req.user._id.toString()) {
+    // 3. Only complaint owner can reopen it
+    if (
+      complaint.createdBy.toString() !== req.user._id.toString()
+    ) {
       return res.status(403).json({
         success: false,
-        message: "You do not have permission to reopen this complaint",
+        message:
+          "You do not have permission to reopen this complaint",
       });
     }
 
-    // Only resolved complaints can be reopened
+    // 4. Only RESOLVED complaints can be reopened
     if (complaint.status !== "RESOLVED") {
       return res.status(400).json({
         success: false,
@@ -526,24 +638,36 @@ export const reopenComplaint = async (req, res) => {
 
     const previousStatus = complaint.status;
 
-complaint.status = "REOPENED";
+    complaint.status = "REOPENED";
 
-if (!complaint.resolution) {
-  complaint.resolution = {};
-}
+    if (!complaint.resolution) {
+      complaint.resolution = {};
+    }
 
-complaint.resolution.reopenReason = reason.trim();
+    complaint.resolution.reopenReason = reason.trim();
 
-await complaint.save();
+    await complaint.save();
 
-await createAuditLog({
-  complaint: complaint._id,
-  performedBy: req.user._id,
-  action: "REOPENED",
-  previousStatus,
-  newStatus: "REOPENED",
-  details: `Student reopened the complaint: ${reason.trim()}`,
-});
+    // Audit log
+    await createAuditLog({
+      complaint: complaint._id,
+      performedBy: req.user._id,
+      action: "REOPENED",
+      previousStatus,
+      newStatus: "REOPENED",
+      details: `Student reopened the complaint: ${reason.trim()}`,
+    });
+
+    // Notify assigned staff
+    if (complaint.assignedTo) {
+      await createNotification({
+        recipient: complaint.assignedTo,
+        complaint: complaint._id,
+        type: "COMPLAINT_REOPENED",
+        title: "Complaint Reopened",
+        message: `Complaint ${complaint.complaintId} has been reopened by the student.`,
+      });
+    }
 
     return res.status(200).json({
       success: true,
