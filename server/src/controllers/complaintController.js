@@ -3,6 +3,7 @@ import createNotification from "../utils/createNotification.js";
 import Complaint from "../models/Complaint.js";
 import Category from "../models/Category.js";
 import User from "../models/User.js";
+import uploadToCloudinary from "../utils/uploadToCloudinary.js";
 
 
 // ============================================================
@@ -681,6 +682,150 @@ export const reopenComplaint = async (req, res) => {
     });
   } catch (error) {
     console.error("Reopen complaint error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+
+export const uploadComplaintEvidence = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. File check
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Evidence image is required",
+      });
+    }
+
+    // 2. Find complaint
+    const complaint = await Complaint.findById(id);
+
+    if (!complaint) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found",
+      });
+    }
+
+    // 3. Only complaint owner can upload evidence
+    if (
+      complaint.createdBy.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to upload evidence",
+      });
+    }
+
+    // 4. Upload image to Cloudinary
+    const uploadedFile = await uploadToCloudinary(
+      req.file.buffer,
+      "unisolve/complaints"
+    );
+
+    // 5. Store Cloudinary information in MongoDB
+    complaint.evidence.push({
+      url: uploadedFile.url,
+      publicId: uploadedFile.publicId,
+    });
+
+    await complaint.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Complaint evidence uploaded successfully",
+      evidence: {
+        url: uploadedFile.url,
+        publicId: uploadedFile.publicId,
+      },
+    });
+  } catch (error) {
+    console.error("Upload complaint evidence error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+export const uploadResolutionEvidence = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. File check
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Resolution evidence image is required",
+      });
+    }
+
+    // 2. Find complaint
+    const complaint = await Complaint.findById(id);
+
+    if (!complaint) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found",
+      });
+    }
+
+    // 3. Only assigned staff can upload resolution evidence
+    if (
+      !complaint.assignedTo ||
+      complaint.assignedTo.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "This complaint is not assigned to you",
+      });
+    }
+
+    // 4. Resolution evidence should be uploaded while resolving
+    if (!["IN_PROGRESS", "RESOLVED"].includes(complaint.status)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Resolution evidence can only be uploaded for in-progress or resolved complaints",
+      });
+    }
+
+    // 5. Upload to Cloudinary
+    const uploadedFile = await uploadToCloudinary(
+      req.file.buffer,
+      "unisolve/resolutions"
+    );
+
+    // 6. Make sure resolution exists
+    if (!complaint.resolution) {
+      complaint.resolution = {};
+    }
+
+    // 7. Store evidence
+    complaint.resolution.evidence.push({
+      url: uploadedFile.url,
+      publicId: uploadedFile.publicId,
+    });
+
+    await complaint.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Resolution evidence uploaded successfully",
+      evidence: {
+        url: uploadedFile.url,
+        publicId: uploadedFile.publicId,
+      },
+    });
+  } catch (error) {
+    console.error("Upload resolution evidence error:", error);
 
     return res.status(500).json({
       success: false,

@@ -11,12 +11,16 @@ import {
   resolveComplaint,
   closeComplaint,
   reopenComplaint,
+  uploadComplaintEvidence,
+  uploadResolutionEvidence,
 } from "../controllers/complaintController.js";
 
 import {
   protect,
   requireRole,
 } from "../middleware/authMiddleware.js";
+
+import upload from "../middleware/uploadMiddleware.js";
 
 const router = express.Router();
 
@@ -32,6 +36,13 @@ router.get(
 );
 
 router.get("/", protect, requireRole("ADMIN"), getAllComplaints);
+
+router.post(
+  "/:id/evidence",
+  protect,
+  upload.single("evidence"),
+  uploadComplaintEvidence
+);
 
 router.patch(
   "/:id/assign",
@@ -74,5 +85,13 @@ router.get(
   requireRole("STUDENT"),
   getComplaintById
 );
+
+router.post(
+  "/:id/resolution-evidence",
+  protect,
+  upload.single("evidence"),
+  uploadResolutionEvidence
+);
+
 
 export default router;
