@@ -1,6 +1,9 @@
+import createAuditLog from "../utils/createAuditLog.js";
 import Complaint from "../models/Complaint.js";
 import Category from "../models/Category.js";
 import User from "../models/User.js";
+
+
 
 export const createComplaint = async (req, res) => {
   try {
@@ -49,6 +52,16 @@ export const createComplaint = async (req, res) => {
       isAnonymous: Boolean(isAnonymous),
       status: "PENDING",
     });
+
+    //audit logs
+    await createAuditLog({
+  complaint: complaint._id,
+  performedBy: req.user._id,
+  action: "CREATED",
+  previousStatus: null,
+  newStatus: "PENDING",
+  details: "Complaint created by student",
+});
 
     // 5. Return created complaint
     return res.status(201).json({
@@ -207,6 +220,15 @@ export const assignComplaint = async (req, res) => {
 
     await complaint.save();
 
+    await createAuditLog({
+  complaint: complaint._id,
+  performedBy: req.user._id,
+  action: "ASSIGNED",
+  previousStatus: "PENDING",
+  newStatus: "ASSIGNED",
+  details: `Complaint assigned to staff member ${staff.name}`,
+});
+
     return res.status(200).json({
       success: true,
       message: "Complaint assigned successfully",
@@ -285,6 +307,18 @@ export const startComplaint = async (req, res) => {
 
     await complaint.save();
 
+    await createAuditLog({
+  complaint: complaint._id,
+  performedBy: req.user._id,
+  action: "STARTED",
+  previousStatus: complaint.status === "REOPENED"
+    ? "REOPENED"
+    : "ASSIGNED",
+  newStatus: "IN_PROGRESS",
+  details: "Staff started working on the complaint",
+});
+
+
     return res.status(200).json({
       success: true,
       message: "Complaint moved to in-progress",
@@ -348,11 +382,24 @@ export const resolveComplaint = async (req, res) => {
     }
 
     // 5. Store resolution
-    complaint.resolution.notes = notes.trim();
-    complaint.status = "RESOLVED";
-    complaint.resolvedAt = new Date();
+    const previousStatus = complaint.status;
 
-    await complaint.save();
+complaint.resolution.notes = notes.trim();
+complaint.status = "RESOLVED";
+complaint.resolvedAt = new Date();
+
+await complaint.save();
+
+await createAuditLog({
+  complaint: complaint._id,
+  performedBy: req.user._id,
+  action: "RESOLVED",
+  previousStatus,
+  newStatus: "RESOLVED",
+  details: "Staff resolved the complaint",
+});
+
+
 
     return res.status(200).json({
       success: true,
@@ -404,10 +451,21 @@ export const closeComplaint = async (req, res) => {
       });
     }
 
-    complaint.status = "CLOSED";
-    complaint.closedAt = new Date();
+    const previousStatus = complaint.status;
 
-    await complaint.save();
+complaint.status = "CLOSED";
+complaint.closedAt = new Date();
+
+await complaint.save();
+
+await createAuditLog({
+  complaint: complaint._id,
+  performedBy: req.user._id,
+  action: "CLOSED",
+  previousStatus,
+  newStatus: "CLOSED",
+  details: "Student accepted the resolution and closed the complaint",
+});
 
     return res.status(200).json({
       success: true,
@@ -466,18 +524,26 @@ export const reopenComplaint = async (req, res) => {
       });
     }
 
-    complaint.status = "REOPENED";
+    const previousStatus = complaint.status;
 
-    // Keep the original resolution for history/reference.
-    // Staff can add a new resolution when the complaint is worked on again.
+complaint.status = "REOPENED";
 
-    if (!complaint.resolution) {
-      complaint.resolution = {};
-    }
+if (!complaint.resolution) {
+  complaint.resolution = {};
+}
 
-    complaint.resolution.reopenReason = reason.trim();
+complaint.resolution.reopenReason = reason.trim();
 
-    await complaint.save();
+await complaint.save();
+
+await createAuditLog({
+  complaint: complaint._id,
+  performedBy: req.user._id,
+  action: "REOPENED",
+  previousStatus,
+  newStatus: "REOPENED",
+  details: `Student reopened the complaint: ${reason.trim()}`,
+});
 
     return res.status(200).json({
       success: true,
