@@ -6,6 +6,11 @@ import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import complaintRoutes from "./routes/complaintRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import categoryRoutes from "./routes/categoryRoutes.js";
+import auditLogRoutes from "./routes/auditLogRoutes.js";
+
+
+
 
 const app = express();
 
@@ -24,6 +29,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/complaints", complaintRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/audit-logs", auditLogRoutes);
 
 
 app.get("/api/health", (req, res) => {

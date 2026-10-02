@@ -82,7 +82,7 @@ router.patch(
 router.get(
   "/:id",
   protect,
-  requireRole("STUDENT"),
+  requireRole("STUDENT", "STAFF", "ADMIN"),
   getComplaintById
 );
 

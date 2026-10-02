@@ -60,18 +60,32 @@ export const registerUser = async (req, res) => {
 
 export const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
     // 1. Validate input
-    if (!email || !password) {
+    if (!email || !password || !role) {
       return res.status(400).json({
         success: false,
-        message: "Email and password are required",
+        message: "Email, password, and role are required",
       });
     }
 
-    // 2. Find user and explicitly include password
-    const user = await User.findOne({ email }).select("+password");
+    // 2. Normalize role
+    const normalizedRole = role.toUpperCase();
+
+    const allowedRoles = ["STUDENT", "STAFF", "ADMIN"];
+
+    if (!allowedRoles.includes(normalizedRole)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid role",
+      });
+    }
+
+    // 3. Find user and explicitly include password
+    const user = await User.findOne({
+      email: email.trim().toLowerCase(),
+    }).select("+password");
 
     if (!user) {
       return res.status(401).json({
@@ -80,7 +94,7 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // 3. Check account status
+    // 4. Check account status
     if (!user.isActive) {
       return res.status(403).json({
         success: false,
@@ -88,7 +102,15 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // 4. Compare password
+    // 5. Verify selected role against database role
+    if (user.role !== normalizedRole) {
+      return res.status(401).json({
+        success: false,
+        message: "The selected role does not match this account",
+      });
+    }
+
+    // 6. Compare password
     const isPasswordCorrect = await bcrypt.compare(
       password,
       user.password
@@ -101,7 +123,7 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // 5. Generate JWT
+    // 7. Generate JWT
     const token = jwt.sign(
       {
         userId: user._id,
@@ -113,15 +135,18 @@ export const loginUser = async (req, res) => {
       }
     );
 
-    // 6. Store JWT in HTTP-only cookie
+    // 8. Store JWT in HTTP-only cookie
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      sameSite:
+        process.env.NODE_ENV === "production"
+          ? "none"
+          : "lax",
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    // 7. Return safe user information
+    // 9. Return safe user information
     return res.status(200).json({
       success: true,
       message: "Login successful",

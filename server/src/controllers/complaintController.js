@@ -145,24 +145,41 @@ export const getComplaintById = async (req, res) => {
       });
     }
 
-    // Student can only access their own complaint
-    if (
-      complaint.createdBy._id.toString() !==
-      req.user._id.toString()
-    ) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "You do not have permission to view this complaint",
-      });
+    const userId = req.user._id.toString();
+
+    // STUDENT → can only view their own complaints
+    if (req.user.role === "STUDENT") {
+      if (
+        complaint.createdBy._id.toString() !== userId
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "You do not have permission to view this complaint",
+        });
+      }
     }
+
+    // STAFF → can only view complaints assigned to them
+    if (req.user.role === "STAFF") {
+      if (
+        !complaint.assignedTo ||
+        complaint.assignedTo._id.toString() !== userId
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "This complaint is not assigned to you",
+        });
+      }
+    }
+
+    // ADMIN → can view any complaint
 
     return res.status(200).json({
       success: true,
       complaint,
     });
   } catch (error) {
-    console.error("Get complaint error:", error);
+    console.error("Get complaint by ID error:", error);
 
     return res.status(500).json({
       success: false,
