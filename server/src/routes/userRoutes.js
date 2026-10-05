@@ -6,6 +6,7 @@ import {
   getStaffUsers,
   getAllUsers,
   toggleUserStatus,
+  createStaffUser,
 } from "../controllers/userController.js";
 
 import {
@@ -41,6 +42,13 @@ router.get(
   getStaffUsers
 );
 
+
+router.post(
+  "/staff",
+  protect,
+  requireRole("ADMIN"),
+  createStaffUser
+);
 /*
 |--------------------------------------------------------------------------
 | All Users

@@ -66,3 +66,8 @@ export const getAuditLogs = async () => {
   const response = await api.get("/audit-logs");
   return response.data;
 };
+
+export const createStaffUser = async (staffData) => {
+  const response = await api.post("/users/staff", staffData);
+  return response.data;
+};

@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import bcrypt from "bcryptjs";
 
 /**
  * Get all active staff users
@@ -127,6 +128,79 @@ export const toggleUserStatus = async (req, res) => {
     });
   } catch (error) {
     console.error("Toggle user status error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+/**
+ * Create a new staff user.
+ * Admin only.
+ */
+export const createStaffUser = async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    // 1. Validate input
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email, and password are required",
+      });
+    }
+
+    // 2. Validate password length
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters",
+      });
+    }
+
+    // 3. Normalize email
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // 4. Check if email already exists
+    const existingUser = await User.findOne({
+      email: normalizedEmail,
+    });
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: "A user with this email already exists",
+      });
+    }
+
+    // 5. Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 6. Create staff account
+    const staffUser = await User.create({
+      name: name.trim(),
+      email: normalizedEmail,
+      password: hashedPassword,
+      role: "STAFF",
+      isActive: true,
+    });
+
+    // 7. Return safe user information
+    return res.status(201).json({
+      success: true,
+      message: "Staff account created successfully",
+      user: {
+        id: staffUser._id,
+        name: staffUser.name,
+        email: staffUser.email,
+        role: staffUser.role,
+        isActive: staffUser.isActive,
+      },
+    });
+  } catch (error) {
+    console.error("Create staff user error:", error);
 
     return res.status(500).json({
       success: false,
