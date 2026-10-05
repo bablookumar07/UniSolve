@@ -1,5 +1,16 @@
 import mongoose from "mongoose";
 
+const CASE_TYPES = [
+  "CAMPUS",
+  "ACADEMIC",
+  "IT",
+  "ADMINISTRATIVE",
+  "TRANSPORT",
+  "LIBRARY",
+  "SAFETY",
+  "OTHER",
+];
+
 const categorySchema = new mongoose.Schema(
   {
     name: {
@@ -17,6 +28,22 @@ const categorySchema = new mongoose.Schema(
       maxlength: [200, "Description cannot exceed 200 characters"],
     },
 
+    caseType: {
+      type: String,
+      enum: {
+        values: CASE_TYPES,
+        message: "Invalid case type",
+      },
+      default: "CAMPUS",
+      required: true,
+    },
+
+    parent: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+      default: null,
+    },
+
     isActive: {
       type: Boolean,
       default: true,
@@ -26,6 +53,10 @@ const categorySchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+categorySchema.index({ caseType: 1 });
+categorySchema.index({ parent: 1 });
+categorySchema.index({ caseType: 1, parent: 1 });
 
 const Category = mongoose.model("Category", categorySchema);
 
