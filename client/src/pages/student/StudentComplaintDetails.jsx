@@ -233,12 +233,12 @@ const StudentComplaintDetails = () => {
       <div className="min-h-full bg-gray-50 p-6 dark:bg-slate-950">
         <div className="mx-auto max-w-3xl">
           <Link
-            to="/student/complaints"
-            className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-          >
-            <ArrowLeft size={17} />
-            Back to complaints
-          </Link>
+  to="/student/requests"
+  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-slate-700 dark:text-gray-300 dark:hover:bg-slate-800"
+>
+  <ArrowLeft size={16} />
+  Back to My Requests
+</Link>
 
           <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
             <div className="flex items-start gap-3">
@@ -268,12 +268,12 @@ const StudentComplaintDetails = () => {
 
         {/* Back */}
         <Link
-          to="/student/complaints"
-          className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 transition hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
-        >
-          <ArrowLeft size={17} />
-          Back to My Complaints
-        </Link>
+  to="/student/requests"
+  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-slate-700 dark:text-gray-300 dark:hover:bg-slate-800"
+>
+  <ArrowLeft size={16} />
+  Back to My Requests
+</Link>
 
         {/* Error */}
         {error && (

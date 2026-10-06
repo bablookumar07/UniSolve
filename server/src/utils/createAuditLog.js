@@ -1,7 +1,8 @@
 import AuditLog from "../models/AuditLog.js";
 
 const createAuditLog = async ({
-  complaint,
+  complaint = null,
+  case: caseId = null,
   performedBy,
   action,
   previousStatus = null,
@@ -11,6 +12,7 @@ const createAuditLog = async ({
   try {
     await AuditLog.create({
       complaint,
+      case: caseId,
       performedBy,
       action,
       previousStatus,

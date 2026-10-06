@@ -30,6 +30,10 @@ import StudentComplaints from "./pages/student/StudentComplaints";
 import StudentComplaintDetails from "./pages/student/StudentComplaintDetails";
 import NewComplaint from "./pages/student/NewComplaint";
 import StudentNotifications from "./pages/student/StudentNotifications";
+import StudentCases from "./pages/student/StudentCases";
+import NewCase from "./pages/student/NewCase";
+import StudentCaseDetails from "./pages/student/StudentCaseDetails";
+import StudentSupport from "./pages/student/StudentSupport";
 
 const App = () => {
   return (
@@ -85,7 +89,27 @@ const App = () => {
     path="/student/notifications"
     element={<StudentNotifications />}
   />
+  
 
+ <Route
+    path="/student/cases"
+    element={<StudentCases />}
+  />
+
+  <Route
+  path="/student/cases/new"
+  element={<NewCase />}
+/>
+
+<Route
+  path="/student/cases/:id"
+  element={<StudentCaseDetails />}
+/>
+
+<Route
+  path="/student/requests"
+  element={<StudentSupport />}
+/>
   
 </Route>
 

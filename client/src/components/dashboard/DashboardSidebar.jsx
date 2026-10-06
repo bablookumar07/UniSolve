@@ -40,22 +40,22 @@ const DashboardSidebar = ({ isOpen, onClose }) => {
   }, []);
 
   const studentLinks = [
-    {
-      to: "/student/dashboard",
-      label: "Dashboard",
-      icon: LayoutDashboard,
-    },
-    {
-      to: "/student/complaints",
-      label: "My Complaints",
-      icon: MessageSquare,
-    },
-    {
-      to: "/student/notifications",
-      label: "Notifications",
-      icon: Bell,
-    },
-  ];
+  {
+    to: "/student/dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    to: "/student/requests",
+    label: "My Requests",
+    icon: ClipboardList,
+  },
+  {
+    to: "/student/notifications",
+    label: "Notifications",
+    icon: Bell,
+  },
+];
 
   const staffLinks = [
     {
