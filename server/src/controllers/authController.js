@@ -1,7 +1,5 @@
 import bcrypt from "bcryptjs";
-
 import jwt from "jsonwebtoken";
-
 import User from "../models/User.js";
 
 export const registerUser = async (req, res) => {
@@ -17,7 +15,9 @@ export const registerUser = async (req, res) => {
     }
 
     // 2. Check whether user already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({
+      email: email.trim().toLowerCase(),
+    });
 
     if (existingUser) {
       return res.status(409).json({
@@ -32,7 +32,7 @@ export const registerUser = async (req, res) => {
     // 4. Create user
     const user = await User.create({
       name,
-      email,
+      email: email.trim().toLowerCase(),
       password: hashedPassword,
       role: "STUDENT",
     });
@@ -64,6 +64,12 @@ export const loginUser = async (req, res) => {
 
     // 1. Validate input
     if (!email || !password || !role) {
+      console.log("❌ Login validation failed:", {
+        hasEmail: !!email,
+        hasPassword: !!password,
+        hasRole: !!role,
+      });
+
       return res.status(400).json({
         success: false,
         message: "Email, password, and role are required",
@@ -71,59 +77,102 @@ export const loginUser = async (req, res) => {
     }
 
     // 2. Normalize role
-    const normalizedRole = role.toUpperCase();
+    const normalizedRole = role.trim().toUpperCase();
 
     const allowedRoles = ["STUDENT", "STAFF", "ADMIN"];
 
     if (!allowedRoles.includes(normalizedRole)) {
+      console.log("❌ Invalid role received:", normalizedRole);
+
       return res.status(400).json({
         success: false,
         message: "Invalid role",
       });
     }
 
-    // 3. Find user and explicitly include password
+    // 3. Normalize email
+    const normalizedEmail = email.trim().toLowerCase();
+
+    console.log("\n================ LOGIN DEBUG ================");
+    console.log("🔍 Login attempt:", {
+      email: normalizedEmail,
+      role: normalizedRole,
+    });
+
+    // 4. Find user and explicitly include password
     const user = await User.findOne({
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
     }).select("+password");
 
+    console.log("👤 User found:", !!user);
+
+    if (user) {
+      console.log("👤 User details:", {
+        id: user._id.toString(),
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        hasPassword: !!user.password,
+      });
+    }
+
     if (!user) {
+      console.log("❌ USER NOT FOUND");
+      console.log("============================================\n");
+
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
       });
     }
 
-    // 4. Check account status
+    // 5. Check account status
     if (!user.isActive) {
+      console.log("❌ ACCOUNT INACTIVE");
+      console.log("============================================\n");
+
       return res.status(403).json({
         success: false,
         message: "Your account has been deactivated",
       });
     }
 
-    // 5. Verify selected role against database role
+    // 6. Verify selected role against database role
+    console.log("🎭 Role comparison:", {
+      selectedRole: normalizedRole,
+      databaseRole: user.role,
+      match: user.role === normalizedRole,
+    });
+
     if (user.role !== normalizedRole) {
+      console.log("❌ ROLE MISMATCH");
+      console.log("============================================\n");
+
       return res.status(401).json({
         success: false,
         message: "The selected role does not match this account",
       });
     }
 
-    // 6. Compare password
+    // 7. Compare password
     const isPasswordCorrect = await bcrypt.compare(
       password,
       user.password
     );
 
+    console.log("🔐 Password match:", isPasswordCorrect);
+
     if (!isPasswordCorrect) {
+      console.log("❌ PASSWORD MISMATCH");
+      console.log("============================================\n");
+
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
       });
     }
 
-    // 7. Generate JWT
+    // 8. Generate JWT
     const token = jwt.sign(
       {
         userId: user._id,
@@ -135,7 +184,10 @@ export const loginUser = async (req, res) => {
       }
     );
 
-    // 8. Store JWT in HTTP-only cookie
+    console.log("✅ Password verified");
+    console.log("🔑 JWT generated");
+
+    // 9. Store JWT in HTTP-only cookie
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -146,7 +198,11 @@ export const loginUser = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    // 9. Return safe user information
+    console.log("🍪 Authentication cookie set");
+    console.log("✅ LOGIN SUCCESS");
+    console.log("============================================\n");
+
+    // 10. Return safe user information
     return res.status(200).json({
       success: true,
       message: "Login successful",
@@ -158,7 +214,7 @@ export const loginUser = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("❌ Login error:", error);
 
     return res.status(500).json({
       success: false,
@@ -172,7 +228,10 @@ export const logoutUser = async (req, res) => {
     res.clearCookie("token", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      sameSite:
+        process.env.NODE_ENV === "production"
+          ? "none"
+          : "lax",
     });
 
     return res.status(200).json({
