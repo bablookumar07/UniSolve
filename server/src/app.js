@@ -8,6 +8,7 @@ import complaintRoutes from "./routes/complaintRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";
 import auditLogRoutes from "./routes/auditLogRoutes.js";
+import caseRoutes from "./routes/caseRoutes.js";
 
 
 
@@ -35,7 +36,7 @@ app.use("/api/complaints", complaintRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/audit-logs", auditLogRoutes);
-
+app.use("/api/cases", caseRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({
