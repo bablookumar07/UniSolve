@@ -1,6 +1,7 @@
 import Case from "../models/Case.js";
 import Category from "../models/Category.js";
-import AuditLog from "../models/AuditLog.js";
+
+import createAuditLog from "../utils/createAuditLog.js";
 
 const CASE_TYPES = [
   "CAMPUS",
@@ -190,19 +191,14 @@ export const createCase = async (req, res) => {
     // 5. Create Audit Log
     // --------------------------------------------------
 
-    await AuditLog.create({
-      action: "CASE_CREATED",
-      performedBy: req.user._id,
-      targetType: "CASE",
-      targetId: newCase._id,
-      metadata: {
-        caseId: newCase.caseId,
-        caseType: newCase.caseType,
-        category: categoryDoc.name,
-        subcategory: subcategoryDoc?.name || null,
-        priority: newCase.priority,
-      },
-    });
+   await createAuditLog({
+  case: newCase._id,
+  performedBy: req.user._id,
+  action: "CREATED",
+  previousStatus: null,
+  newStatus: "PENDING",
+  details: `Case ${newCase.caseId} created`,
+});
 
     // --------------------------------------------------
     // 6. Populate response
@@ -232,6 +228,113 @@ export const createCase = async (req, res) => {
         process.env.NODE_ENV === "development"
           ? error.message
           : undefined,
+    });
+  }
+};
+
+// ============================================================
+// GET MY CASES
+// GET /api/cases/my
+// Protected
+// ============================================================
+
+export const getMyCases = async (req, res) => {
+  try {
+    const cases = await Case.find({
+      createdBy: req.user._id,
+    })
+      .populate("category", "name description caseType parent")
+      .populate("subcategory", "name description caseType parent")
+      .populate("assignedTo", "name email role")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: cases.length,
+      data: cases,
+    });
+  } catch (error) {
+    console.error("Get my cases error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch your cases",
+    });
+  }
+};
+
+
+// ============================================================
+// GET CASE BY ID
+// GET /api/cases/:id
+// Protected
+// ============================================================
+
+export const getCaseById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const caseData = await Case.findById(id)
+      .populate("category", "name description caseType parent")
+      .populate("subcategory", "name description caseType parent")
+      .populate("createdBy", "name email role")
+      .populate("assignedTo", "name email role");
+
+    if (!caseData) {
+      return res.status(404).json({
+        success: false,
+        message: "Case not found",
+      });
+    }
+
+    const userId = req.user._id.toString();
+
+    // --------------------------------------------------
+    // STUDENT
+    // Can only view own cases
+    // --------------------------------------------------
+
+    if (req.user.role === "STUDENT") {
+      if (caseData.createdBy._id.toString() !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: "You do not have permission to view this case",
+        });
+      }
+    }
+
+    // --------------------------------------------------
+    // STAFF
+    // Can only view cases assigned to them
+    // --------------------------------------------------
+
+    if (req.user.role === "STAFF") {
+      if (
+        !caseData.assignedTo ||
+        caseData.assignedTo._id.toString() !== userId
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "This case is not assigned to you",
+        });
+      }
+    }
+
+    // --------------------------------------------------
+    // ADMIN
+    // Can view any case
+    // --------------------------------------------------
+
+    return res.status(200).json({
+      success: true,
+      data: caseData,
+    });
+  } catch (error) {
+    console.error("Get case by ID error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch case",
     });
   }
 };
